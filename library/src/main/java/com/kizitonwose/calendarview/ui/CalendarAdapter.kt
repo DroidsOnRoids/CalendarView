@@ -17,7 +17,6 @@ import com.kizitonwose.calendarview.utils.orZero
 import java.time.LocalDate
 import java.time.YearMonth
 
-
 internal typealias LP = ViewGroup.LayoutParams
 
 internal data class ViewConfig(
