@@ -23,6 +23,7 @@ android {
     compileOptions {
         sourceCompatibility = 1.8
         targetCompatibility = 1.8
+        coreLibraryDesugaringEnabled = true
     }
     kotlinOptions {
         jvmTarget = "1.8"
@@ -50,4 +51,6 @@ dependencies {
     androidTestImplementation "androidx.test:runner:$versions.androidx_test_runner"
     androidTestImplementation "androidx.test:rules:$versions.androidx_test_rules"
     androidTestImplementation "androidx.test.ext:junit:$versions.androidx_test_junit"
+
+    coreLibraryDesugaring "com.android.tools:desugar_jdk_libs:$versions.core_library_desugaring"
 }
