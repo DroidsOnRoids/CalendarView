@@ -38,17 +38,6 @@ View the sample app's source code [here](https://github.com/kizitonwose/Calendar
 
 #### Step 1
 
-The library uses `java.time` classes via [ThreeTenABP](https://github.com/JakeWharton/ThreeTenABP) for backward compatibility since these classes were added in Java 8. Therefore, you need to initialize ThreeTenABP in your application class.
-
-```kotlin
-class SampleApp : Application() {
-    override fun onCreate() {
-        super.onCreate()
-        AndroidThreeTen.init(this)
-    }
-}
-```
-
 Add CalendarView to your XML like any other view.
 
 ```xml
