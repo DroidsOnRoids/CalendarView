@@ -1,5 +1,6 @@
 package com.kizitonwose.calendarview.ui
 
+import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Rect
 import android.os.Build
@@ -8,6 +9,7 @@ import android.view.ViewGroup
 import android.widget.LinearLayout
 import androidx.annotation.LayoutRes
 import androidx.core.view.ViewCompat
+import androidx.core.view.updateLayoutParams
 import androidx.recyclerview.widget.RecyclerView
 import com.kizitonwose.calendarview.CalendarView
 import com.kizitonwose.calendarview.model.*
@@ -65,7 +67,6 @@ internal class CalendarAdapter(
         val rootLayout = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             id = rootViewId
-            clipChildren = false //#ClipChildrenFix
         }
 
         if (viewConfig.monthHeaderRes != 0) {
@@ -83,7 +84,6 @@ internal class CalendarAdapter(
             layoutParams = LinearLayout.LayoutParams(LP.WRAP_CONTENT, LP.WRAP_CONTENT)
             orientation = LinearLayout.VERTICAL
             id = bodyViewId
-            clipChildren = false //#ClipChildrenFix
         }
         rootLayout.addView(monthBodyLayout)
 
@@ -99,17 +99,19 @@ internal class CalendarAdapter(
         }
 
         fun setupRoot(root: ViewGroup) {
-            ViewCompat.setPaddingRelative(root,
+            ViewCompat.setPaddingRelative(
+                root,
                 calView.monthPaddingStart, calView.monthPaddingTop,
                 calView.monthPaddingEnd, calView.monthPaddingBottom
             )
-            root.layoutParams = ViewGroup.MarginLayoutParams(LP.WRAP_CONTENT, LP.WRAP_CONTENT).apply {
-                bottomMargin = calView.monthMarginBottom
-                topMargin = calView.monthMarginTop
+            root.layoutParams =
+                ViewGroup.MarginLayoutParams(LP.WRAP_CONTENT, LP.WRAP_CONTENT).apply {
+                    bottomMargin = calView.monthMarginBottom
+                    topMargin = calView.monthMarginTop
 
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
-                    marginStart = calView.monthMarginStart
-                    marginEnd = calView.monthMarginEnd
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
+                        marginStart = calView.monthMarginStart
+                        marginEnd = calView.monthMarginEnd
                 } else {
                     leftMargin = calView.monthMarginStart
                     rightMargin = calView.monthMarginEnd
@@ -165,6 +167,7 @@ internal class CalendarAdapter(
 
     private var visibleMonth: CalendarMonth? = null
     private var calWrapsHeight: Boolean? = null
+    private var initialLayout = true
     fun notifyMonthScrollListenerIfNeeded() {
         // Guard for cv.post() calls and other callbacks which use this method.
         if (!isAttached) return
@@ -195,26 +198,37 @@ internal class CalendarAdapter(
                 // calculating height and uses the tallest one of the three meaning that the current index's
                 // view will end up having a blank space at the bottom unless the immediate previous and next
                 // indices are also missing the last row. I think there should be a better way to fix this.
-                if (calView.isHorizontal && calView.scrollMode == ScrollMode.PAGED) {
-                    val calWrapsHeight = calWrapsHeight ?: (calView.layoutParams.height == LP.WRAP_CONTENT).also {
-                        // We modify the layoutParams so we save the initial value set by the user.
-                        calWrapsHeight = it
-                    }
-                    if (calWrapsHeight.not()) return // Bug only happens when the CalenderView wraps its height.
-                    val visibleVH =
-                        calView.findViewHolderForAdapterPosition(visibleItemPos) as? MonthViewHolder ?: return
-                    val newHeight = visibleVH.headerView?.height.orZero() +
-                        // For some reason `visibleVH.bodyLayout.height` does not give us the updated height.
-                        // So we calculate it again by checking the number of visible(non-empty) rows.
-                        visibleMonth.weekDays.size * calView.dayHeight +
-                        visibleVH.footerView?.height.orZero()
-                    if (calView.layoutParams.height != newHeight)
-                        calView.layoutParams = calView.layoutParams.apply {
-                            this.height = newHeight
-                            // If we reset the calendar's height from a short item view's height(month with 5 rows)
-                            // to a longer one(month with 6 rows), the row outside the old height is not drawn.
-                            // This is fixed by setting `clipChildren = false` on all parents. #ClipChildrenFix
+                // New: Also fixes issue where the calendar does not wrap each month's height when in vertical,
+                // paged mode and just matches parent's height instead.
+                if (calView.scrollMode == ScrollMode.PAGED) {
+                    val calWrapsHeight =
+                        calWrapsHeight ?: (calView.layoutParams.height == LP.WRAP_CONTENT).also {
+                            // We modify the layoutParams so we save the initial value set by the user.
+                            calWrapsHeight = it
                         }
+                    if (!calWrapsHeight) return // Bug only happens when the CalenderView wraps its height.
+                    val visibleVH =
+                        calView.findViewHolderForAdapterPosition(visibleItemPos) as? MonthViewHolder
+                            ?: return
+                    val newHeight = visibleVH.headerView?.height.orZero() +
+                            // visibleVH.bodyLayout.height` won't not give us the right height as it differs
+                            // depending on row count in the month. So we calculate the appropriate height
+                            // by checking the number of visible(non-empty) rows.
+                            visibleMonth.weekDays.size * calView.dayHeight +
+                            visibleVH.footerView?.height.orZero()
+                    if (calView.height != newHeight) {
+                        ValueAnimator.ofInt(calView.height, newHeight).apply {
+                            // Don't animate when the view is shown initially.
+                            duration =
+                                if (initialLayout) 0 else calView.wrappedPageHeightAnimationDuration.toLong()
+                            addUpdateListener {
+                                calView.updateLayoutParams { height = it.animatedValue as Int }
+                                visibleVH.itemView.requestLayout()
+                            }
+                            start()
+                        }
+                    }
+                    if (initialLayout) initialLayout = false
                 }
             }
         }

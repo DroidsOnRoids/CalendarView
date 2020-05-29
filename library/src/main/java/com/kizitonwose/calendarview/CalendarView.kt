@@ -6,7 +6,6 @@ import android.view.View.MeasureSpec.UNSPECIFIED
 import android.view.ViewGroup
 import androidx.annotation.Px
 import androidx.recyclerview.widget.DiffUtil
-import androidx.recyclerview.widget.PagerSnapHelper
 import androidx.recyclerview.widget.RecyclerView
 import com.kizitonwose.calendarview.model.*
 import com.kizitonwose.calendarview.ui.*
@@ -198,6 +197,17 @@ open class CalendarView : RecyclerView {
             }
         }
 
+    /**
+     * The duration in milliseconds of the animation used to adjust the CalendarView's
+     * height when [scrollMode] is [ScrollMode.PAGED] and the CalendarView's height is
+     * set to `wrap_content`. The height change happens when the CalendarView scrolls to
+     * a month which has less or more rows than the previous one. Default value is 200.
+     * To disable the animation, set this value to zero.
+     */
+    var wrappedPageHeightAnimationDuration = 200
+
+    private val pagerSnapHelper = CalenderPageSnapHelper()
+
     private var startMonth: YearMonth? = null
     private var endMonth: YearMonth? = null
     private var firstDayOfWeek: DayOfWeek? = null
@@ -218,22 +228,38 @@ open class CalendarView : RecyclerView {
     }
 
     constructor(context: Context, attrs: AttributeSet, defStyleAttr: Int) : super(context, attrs, defStyleAttr) {
-        init(attrs, defStyleAttr, 0)
+        init(attrs, defStyleAttr, defStyleAttr)
     }
 
     private fun init(attributeSet: AttributeSet, defStyleAttr: Int, defStyleRes: Int) {
         if (isInEditMode) return
         val a = context.obtainStyledAttributes(attributeSet, R.styleable.CalendarView, defStyleAttr, defStyleRes)
-        dayViewResource = a.getResourceId(R.styleable.CalendarView_cv_dayViewResource, dayViewResource)
-        monthHeaderResource = a.getResourceId(R.styleable.CalendarView_cv_monthHeaderResource, monthHeaderResource)
-        monthFooterResource = a.getResourceId(R.styleable.CalendarView_cv_monthFooterResource, monthFooterResource)
+        dayViewResource =
+            a.getResourceId(R.styleable.CalendarView_cv_dayViewResource, dayViewResource)
+        monthHeaderResource =
+            a.getResourceId(R.styleable.CalendarView_cv_monthHeaderResource, monthHeaderResource)
+        monthFooterResource =
+            a.getResourceId(R.styleable.CalendarView_cv_monthFooterResource, monthFooterResource)
         orientation = a.getInt(R.styleable.CalendarView_cv_orientation, orientation)
-        scrollMode = ScrollMode.values()[a.getInt(R.styleable.CalendarView_cv_scrollMode, scrollMode.ordinal)]
-        outDateStyle = OutDateStyle.values()[a.getInt(R.styleable.CalendarView_cv_outDateStyle, outDateStyle.ordinal)]
-        inDateStyle = InDateStyle.values()[a.getInt(R.styleable.CalendarView_cv_inDateStyle, inDateStyle.ordinal)]
+        scrollMode = ScrollMode.values()[a.getInt(
+            R.styleable.CalendarView_cv_scrollMode,
+            scrollMode.ordinal
+        )]
+        outDateStyle = OutDateStyle.values()[a.getInt(
+            R.styleable.CalendarView_cv_outDateStyle,
+            outDateStyle.ordinal
+        )]
+        inDateStyle = InDateStyle.values()[a.getInt(
+            R.styleable.CalendarView_cv_inDateStyle,
+            inDateStyle.ordinal
+        )]
         maxRowCount = a.getInt(R.styleable.CalendarView_cv_maxRowCount, maxRowCount)
         monthViewClass = a.getString(R.styleable.CalendarView_cv_monthViewClass)
         hasBoundaries = a.getBoolean(R.styleable.CalendarView_cv_hasBoundaries, hasBoundaries)
+        wrappedPageHeightAnimationDuration = a.getInt(
+            R.styleable.CalendarView_cv_wrappedPageHeightAnimationDuration,
+            wrappedPageHeightAnimationDuration
+        )
         a.recycle()
     }
 
@@ -563,8 +589,6 @@ open class CalendarView : RecyclerView {
         }
     }
 
-    private val pagerSnapHelper = PagerSnapHelper()
-
     /**
      * Setup the CalendarView. You can call this any time to change the
      * the desired [startMonth], [endMonth] or [firstDayOfWeek] on the Calendar.
@@ -582,9 +606,6 @@ open class CalendarView : RecyclerView {
             this.startMonth = startMonth
             this.endMonth = endMonth
             this.firstDayOfWeek = firstDayOfWeek
-
-            clipToPadding = false
-            clipChildren = false //#ClipChildrenFix
 
             // Remove the listener before adding again to prevent
             // multiple additions if we already added it before.

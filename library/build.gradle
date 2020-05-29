@@ -35,6 +35,7 @@ android {
 dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar'])
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$versions.kotlin_lang"
+    implementation "androidx.core:core-ktx:$versions.androidx_core_ktx"
 
     // Expose RecyclerView which is CalendarView's superclass to
     // prevent a compile error when using the library in a project:
